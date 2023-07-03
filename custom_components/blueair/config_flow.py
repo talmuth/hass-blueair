@@ -20,9 +20,10 @@ async def validate_input(hass: core.HomeAssistant, data):
     session = async_get_clientsession(hass)
     try:
         client = await hass.async_add_executor_job(
-            lambda: blueair.BlueAir(
+            lambda: blueair.BlueAirAws(
                 username=data[CONF_USERNAME],
-                password=data[CONF_PASSWORD]
+                password=data[CONF_PASSWORD],
+                region='us'
             )
         )
         LOGGER.debug(f"Connecting as {data[CONF_USERNAME]}")
