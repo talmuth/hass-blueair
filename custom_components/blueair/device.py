@@ -1,19 +1,19 @@
 """Blueair device object."""
+
 import asyncio
-from datetime import datetime, timedelta
+from asyncio import timeout
+from datetime import timedelta
 from typing import Any
-from async_timeout import timeout
-
-
-from . import blueair
-
-API = blueair.BlueAir
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import suppress
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-import homeassistant.util.dt as dt_util
 
+from . import blueair
 from .const import DOMAIN, LOGGER
+
+API = blueair.BlueAir
 
 
 class BlueairDataUpdateCoordinator(DataUpdateCoordinator):
@@ -118,7 +118,7 @@ class BlueairDataUpdateCoordinator(DataUpdateCoordinator):
 
     @property
     def all_pollution(self) -> float:
-        """Return all pollution"""
+        """Return all pollution."""
         if "all_pollution" not in self._datapoint:
             return None
         return self._datapoint["all_pollution"]
@@ -131,7 +131,7 @@ class BlueairDataUpdateCoordinator(DataUpdateCoordinator):
         return int(self._attribute["fan_speed"])
 
     @property
-    def is_on(self) -> bool():
+    def is_on(self) -> False:
         """Return the current fan state."""
         if "fan_speed" not in self._attribute:
             return None
@@ -141,15 +141,18 @@ class BlueairDataUpdateCoordinator(DataUpdateCoordinator):
 
     @property
     def fan_mode(self) -> str:
-        """Return the current fan mode"""
+        """Return the current fan mode."""
         if self._attribute["mode"] == "manual":
             return None
         return self._attribute["mode"]
 
     @property
-    def fan_mode_supported(self) -> bool():
-        """Return if fan mode is supported. This function is used to lock out unsupported
-         functionality from the UI if the model doesnt support modes"""
+    def fan_mode_supported(self) -> False:
+        """Return if fan mode is supported.
+
+        This function is used to lock out unsupported
+        functionality from the UI if the model doesnt support modes.
+        """
         if "mode" in self._attribute:
             return True
         return False
@@ -161,7 +164,30 @@ class BlueairDataUpdateCoordinator(DataUpdateCoordinator):
             return None
         return self._attribute["filter_status"]
 
+    @property
+    def child_lock(self) -> str:
+        """Return the child lock status."""
+        if "child_lock" not in self._attribute:
+            return None
+        return self._attribute["child_lock"]
+
+    @property
+    def room_location(self) -> str:
+        """Return the room location."""
+        return self._device_information.get("roomLocation", None)
+
+    @property
+    def firmware(self) -> str:
+        """Return the firmware version."""
+        return self._device_information.get("firmware", None)
+
+    @property
+    def mac_address(self) -> str:
+        """Return the mac address."""
+        return format_mac(self._device_information.get("mac", None))
+
     async def set_fan_speed(self, new_speed) -> None:
+        """Set the fan speed to the specified value."""
         await self.hass.async_add_executor_job(
             lambda: self.api_client.set_fan_speed(self.id, new_speed)
         )
@@ -169,6 +195,7 @@ class BlueairDataUpdateCoordinator(DataUpdateCoordinator):
         await self.async_refresh()
 
     async def set_fan_mode(self, new_mode) -> None:
+        """Set the fan mode to the specified value."""
         await self.hass.async_add_executor_job(
             lambda: self.api_client.set_fan_mode(self.id, new_mode)
         )
@@ -182,13 +209,12 @@ class BlueairDataUpdateCoordinator(DataUpdateCoordinator):
             lambda: self.api_client.get_info(self._uuid)
         )
         LOGGER.info(f"_device_information: {self._device_information}")
-        try:
+
+        with suppress(Exception):
             # Classics will not have the expected data here
             self._datapoint = await self.hass.async_add_executor_job(
                 lambda: self.api_client.get_current_data_point(self._uuid)
             )
-        except Exception:
-            pass
         LOGGER.info(f"_datapoint: {self._datapoint}")
         self._attribute = await self.hass.async_add_executor_job(
             lambda: self.api_client.get_attributes(self._uuid)

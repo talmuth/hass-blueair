@@ -1,5 +1,4 @@
 """Base entity class for Blueair entities."""
-from typing import Any
 
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 from homeassistant.helpers.entity import DeviceInfo, Entity
@@ -26,17 +25,19 @@ class BlueairEntity(Entity):
         self._attr_unique_id = f"{device.id}_{entity_type}"
 
         self._device: BlueairDataUpdateCoordinator = device
-        self._state: Any = None
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return a device description for device registry."""
-        return {
-            "identifiers": {(DOMAIN, self._device.id)},
-            "manufacturer": self._device.manufacturer,
-            "model": self._device.model,
-            "name": self._device.device_name,
-        }
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._device.id)},
+            manufacturer=self._device.manufacturer,
+            model=self._device.model,
+            name=self._device.device_name,
+            suggested_area=self._device.room_location,
+            sw_version=self._device.firmware,
+            connections={(CONNECTION_NETWORK_MAC, self._device.mac_address)},
+        )
 
     async def async_update(self):
         """Update Blueair entity."""
